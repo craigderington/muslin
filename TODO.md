@@ -8,7 +8,8 @@ Loop: Plan → Work → Assess → Build → Test → Deploy → Iterate
 - [x] Rootless initramfs builder (no mknod, reproducible cpio ordering)
 - [x] Kernel = tinyconfig + 21-line fragment (validated against 6.12.48: all options stick)
 - [x] QEMU runner (auto KVM) + headless `make test` selftest
-- [x] Sandbox results: init 58 KB static; kernel→userspace 2.5s under TCG; poweroff exits QEMU
+- [x] Sandbox results: our 6.12.48 kernel 1.3 MB, init 58 KB static, **0.75s to userspace under TCG (no KVM)**, ACPI poweroff exits QEMU
+- [x] Fragment fix: TMPFS silently dropped without SHMEM (caught by validation)
 - [ ] **Craig:** `./muslin image && ./muslin build && ./muslin test && ./muslin run` on the desktop
 - [ ] **Craig:** record KVM boot time here → ______ s
 
