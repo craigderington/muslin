@@ -1,0 +1,8 @@
+# Layered on by ./muslin when /dev/kvm exists (sub-second boots).
+services:
+  builder:
+    devices: [ "/dev/kvm:/dev/kvm" ]
+    group_add: [ "${KVM_GID:-0}" ]
+  qemu:
+    devices: [ "/dev/kvm:/dev/kvm" ]
+    group_add: [ "${KVM_GID:-0}" ]

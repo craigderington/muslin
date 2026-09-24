@@ -1,0 +1,3 @@
+#!/bin/sh
+# One-shot boot tasks. Keep it fast.
+ip link set lo up 2>/dev/null

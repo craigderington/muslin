@@ -1,0 +1,15 @@
+services:
+  builder:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    image: muslin-builder:latest
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    volumes: [ "./:/muslin" ]
+    command: make all
+
+  qemu:
+    image: muslin-builder:latest
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    volumes: [ "./:/muslin" ]
+    stdin_open: true
+    tty: true
+    command: make run

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Host entrypoint. Everything builds and boots inside Docker.
+set -euo pipefail
+cd "$(dirname "$0")"
+export HOST_UID=$(id -u) HOST_GID=$(id -g)
+files=(-f compose.yml)
+if [[ -e /dev/kvm ]]; then
+  export KVM_GID=$(stat -c %g /dev/kvm); files+=(-f compose.kvm.yml)
+fi
+dc() { docker compose "${files[@]}" "$@"; }
+
+case "${1:-help}" in
+  image)  dc build ;;
+  build)  shift; dc run --rm builder make all "$@" ;;
+  run)    dc run --rm qemu ;;
+  test)   dc run --rm builder make test ;;
+  shell)  dc run --rm builder sh ;;
+  make)   shift; dc run --rm builder make "$@" ;;
+  clean)  dc run --rm builder make clean ;;
+  *) cat <<USAGE
+muslin: image | build | run | test | shell | make <target> | clean
+  run → serial console in this terminal. 'poweroff' or Ctrl-A X to leave.
+USAGE
+  ;;
+esac

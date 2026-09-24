@@ -1,0 +1,2 @@
+export PS1='\[\e[1;36m\]\u@\h\[\e[0m\]:\w# '
+[ -f /etc/motd ] && cat /etc/motd
