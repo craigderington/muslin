@@ -19,6 +19,10 @@ cp "$INIT" "$STAGE/sbin/init"
 ln -sf /sbin/init "$STAGE/init"           # kernel runs /init from initramfs
 cp -a "$OVERLAY"/. "$STAGE"/
 
-( cd "$STAGE" && find . -print0 | sort -z | cpio --null -o -H newc --owner=0:0 --quiet ) \
+# cpio stores mtimes; normalize every entry so identical inputs reproduce.
+find "$STAGE" -exec touch -h -d "@${SOURCE_DATE_EPOCH:-0}" {} +
+
+( cd "$STAGE" && find . -print0 | sort -z | \
+    cpio --null -o -H newc --owner=0:0 --reproducible --quiet ) \
     | gzip -9n > "$OUT"
 echo "initramfs: $OUT ($(du -h "$OUT" | cut -f1))"

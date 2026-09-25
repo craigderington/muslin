@@ -21,3 +21,8 @@ CONFIG_TMPFS=y
 # ACPI so `poweroff` actually exits QEMU
 CONFIG_PCI=y
 CONFIG_ACPI=y
+# Serial-only appliance: omit unused emulated desktop/input subsystems.
+CONFIG_VT=n
+CONFIG_INPUT=n
+CONFIG_HID=n
+CONFIG_SERIO=n

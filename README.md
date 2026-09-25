@@ -8,8 +8,17 @@ Boots to a shell in QEMU in well under a second with KVM.
 ./muslin build   # fetch + build kernel, busybox, init → out/
 ./muslin test    # headless boot, expects MUSLIN_SELFTEST_OK
 ./muslin run     # serial console in your terminal (poweroff / Ctrl-A X)
+./muslin verify  # verify pinned SHA-256 hashes and upstream signatures
+./muslin budget  # enforce artifact sizes and <500 ms KVM boot
+./muslin profile # show the slowest kernel initcalls
+./muslin reproducible # two clean builds, byte-for-byte artifact comparison
 ./muslin shell   # drop into the builder
 ```
+
+Downloads are accepted only when both their pinned SHA-256 and detached
+signature match the pinned upstream signer fingerprint. Reproducible builds use
+a fixed epoch, kernel identity, build version, filesystem mtimes, cpio inode
+numbers, ordering, and gzip headers.
 
 ## Layout
 | Path | What |

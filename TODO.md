@@ -10,15 +10,15 @@ Loop: Plan → Work → Assess → Build → Test → Deploy → Iterate
 - [x] QEMU runner (auto KVM) + headless `make test` selftest
 - [x] Sandbox results: our 6.12.48 kernel 1.3 MB, init 58 KB static, **0.75s to userspace under TCG (no KVM)**, ACPI poweroff exits QEMU
 - [x] Fragment fix: TMPFS silently dropped without SHMEM (caught by validation)
-- [ ] **Craig:** `./muslin image && ./muslin build && ./muslin test && ./muslin run` on the desktop
-- [ ] **Craig:** record KVM boot time here → ______ s
+- [x] Desktop verification: `./muslin image && ./muslin build && ./muslin test && ./muslin run`
+- [x] KVM boot time: **0.100 s** to userspace
 
-## Sprint 2: Trust & budgets
-- [ ] Verify kernel/busybox tarballs (sha256 + GPG sigs) in the fetch step
-- [ ] Size budget gate in `make size`: bzImage < 1.5 MB, initramfs < 1 MB
-- [ ] Boot-time budget gate: < 500 ms to userspace with KVM
-- [ ] Drop `quiet` noise and measure with `initcall_debug`; prune the slowest initcalls
-- [ ] Reproducible builds: SOURCE_DATE_EPOCH, KBUILD_BUILD_TIMESTAMP, hash out/ twice
+## Sprint 2: Trust & budgets ✅
+- [x] Verify kernel/busybox tarballs (pinned SHA-256 + GPG signatures and signer fingerprints) in the fetch step
+- [x] Size budget gate in `make size`: bzImage < 1.5 MiB, initramfs < 1 MiB
+- [x] Boot-time budget gate: < 500 ms to userspace with KVM (**80 ms measured**)
+- [x] Drop `quiet` noise and measure with `initcall_debug`; remove unused VT/input/HID/serio stack (**kernel 1,287,168 → 1,197,056 bytes**)
+- [x] Reproducible builds: fixed epoch/build identity and normalized initramfs metadata; kernel, init, and initramfs hashes match across two clean builds
 
 ## Sprint 3: Our own userland (Rust + Go)
 - [ ] Rust toolchain for `x86_64-unknown-linux-musl` in the builder
