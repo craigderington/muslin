@@ -4,7 +4,8 @@ set -eu
 LOG=$(mktemp)
 APPEND_EXTRA=muslin.selftest timeout "${TIMEOUT:-90}" \
     "$(dirname "$0")/run-qemu.sh" "$1" "$2" </dev/null >"$LOG" 2>&1 || true
-if grep -a -q MUSLIN_SELFTEST_OK "$LOG"; then
+if grep -a -q MUSLIN_SELFTEST_OK "$LOG" && grep -a -q MUSLIN_USERLAND_OK "$LOG"; then
+    grep -a MUSLIN_USERLAND_OK "$LOG" | tail -n 1 | tr -d '\r'
     result=$(grep -a MUSLIN_SELFTEST_OK "$LOG" | tail -n 1 | tr -d '\r')
     echo "$result"
     if [ -n "${BOOT_BUDGET_MS:-}" ]; then

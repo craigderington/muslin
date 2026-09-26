@@ -20,11 +20,12 @@ Loop: Plan → Work → Assess → Build → Test → Deploy → Iterate
 - [x] Drop `quiet` noise and measure with `initcall_debug`; remove unused VT/input/HID/serio stack (**kernel 1,287,168 → 1,197,056 bytes**)
 - [x] Reproducible builds: fixed epoch/build identity and normalized initramfs metadata; kernel, init, and initramfs hashes match across two clean builds
 
-## Sprint 3: Our own userland (Rust + Go)
-- [ ] Rust toolchain for `x86_64-unknown-linux-musl` in the builder
-- [ ] Rewrite PID 1 in Rust as `init-rs`; keep C init as the reference and A/B them on the selftest
-- [ ] Replace BusyBox applets one at a time (ls, cat, ps, dmesg) and track the applet count shrinking
-- [ ] Static Go tool (CGO_ENABLED=0) shipped in the image as proof both ecosystems land clean
+## Sprint 3: Our own userland (Rust + Go) ✅
+- [x] Pinned Rust 1.78 toolchain for `x86_64-unknown-linux-musl` in the builder
+- [x] Rust PID 1 (`init-rs`) with the C init retained as the reference; both pass the same guest selftest (**C 90 ms, Rust 100 ms**)
+- [x] Native Rust `ls`, `cat`, `ps`, and `dmesg`; BusyBox reduced from **398 to 9 applets**
+- [x] Static Go proof binary (`CGO_ENABLED=0`) shipped and executed by the in-guest selftest
+- [x] C image remains inside the 1 MiB initramfs budget (**897,657 bytes**); experimental Rust PID 1 image is **1,102,160 bytes**
 
 ## Sprint 4: Networking
 - [ ] virtio-net in the kernel fragment, `udhcpc` or our own DHCP client

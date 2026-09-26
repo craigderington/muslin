@@ -6,6 +6,7 @@ JOBS            ?= $(shell nproc)
 CC              ?= cc
 SOURCE_DATE_EPOCH ?= 1727395200
 BOOT_BUDGET_MS    ?= 500
+INIT_IMPL         ?= c
 
 B     := build
 DL    := $(B)/dl
@@ -15,8 +16,12 @@ BBSRC := $(B)/busybox-$(BUSYBOX_VERSION)
 
 KERNEL_IMAGE ?= $(OUT)/bzImage
 BUSYBOX_BIN  ?= $(BBSRC)/busybox
-INIT_BIN     := $(OUT)/init
-INITRAMFS    := $(OUT)/initramfs.cpio.gz
+INIT_C_BIN   := $(OUT)/init-c
+INIT_RS_BIN  := $(OUT)/init-rs
+TOOLS_BIN    := $(OUT)/muslin-tools
+GO_BIN       := $(OUT)/muslin-go
+INIT_BIN     := $(OUT)/init-$(INIT_IMPL)
+INITRAMFS    := $(OUT)/initramfs-$(INIT_IMPL).cpio.gz
 
 KERNEL_SIZE_MAX    ?= 1572864
 INITRAMFS_SIZE_MAX ?= 1048576
@@ -37,7 +42,8 @@ export KBUILD_BUILD_USER := muslin
 export KBUILD_BUILD_HOST := muslin
 export KBUILD_BUILD_VERSION := 1
 
-.PHONY: all verify-sources kernel busybox init initramfs run test boot-budget profile size reproducible clean distclean
+.PHONY: all verify-sources kernel busybox init init-c init-rs tools go-tool initramfs \
+        run test test-c test-rs test-all boot-budget profile size reproducible clean distclean
 all: kernel initramfs size
 
 # ── fetch ───────────────────────────────────────────────────────────────
@@ -94,29 +100,48 @@ busybox: $(BUSYBOX_BIN)
 $(BBSRC)/Makefile: $(DL)/busybox-$(BUSYBOX_VERSION).verified
 	tar -xf $(DL)/busybox-$(BUSYBOX_VERSION).tar.bz2 -C $(B) && touch $@
 
-$(BBSRC)/.config: $(BBSRC)/Makefile
-	$(MAKE) -C $(BBSRC) defconfig
-	sed -i -e 's/^# CONFIG_STATIC is not set/CONFIG_STATIC=y/' \
-	       -e 's/^CONFIG_TC=y/# CONFIG_TC is not set/' \
-	       -e 's/^CONFIG_SHA1_HWACCEL=y/# CONFIG_SHA1_HWACCEL is not set/' \
-	       -e 's/^CONFIG_SHA256_HWACCEL=y/# CONFIG_SHA256_HWACCEL is not set/' $@
+$(BBSRC)/.config: $(BBSRC)/Makefile config/busybox.fragment scripts/merge-busybox-config.sh
+	$(MAKE) -C $(BBSRC) allnoconfig
+	scripts/merge-busybox-config.sh $@ config/busybox.fragment
+	yes '' | $(MAKE) -C $(BBSRC) oldconfig
 
 $(BBSRC)/busybox: $(BBSRC)/.config
 	$(MAKE) -C $(BBSRC) -j$(JOBS) CC="$(CC)"
 
 # ── init: our PID 1 ─────────────────────────────────────────────────────
 init: $(INIT_BIN)
+init-c: $(INIT_C_BIN)
+init-rs: $(INIT_RS_BIN)
+tools: $(TOOLS_BIN)
+go-tool: $(GO_BIN)
 
-$(INIT_BIN): src/init/init.c
+$(INIT_C_BIN): src/init/init.c
 	@mkdir -p $(OUT)
 	$(CC) -static -Os -Wall -Wextra -Werror -o $@ $<
 	strip $@
 
+$(INIT_RS_BIN): src/init-rs/main.rs
+	@mkdir -p $(OUT)
+	rustc --target x86_64-unknown-linux-musl --edition 2021 \
+		-C opt-level=z -C panic=abort -C lto=fat -C codegen-units=1 -C relocation-model=static \
+		-C strip=symbols -o $@ $<
+
+$(TOOLS_BIN): src/tools/main.rs
+	@mkdir -p $(OUT)
+	rustc --target x86_64-unknown-linux-musl --edition 2021 \
+		-C opt-level=z -C panic=abort -C lto=fat -C codegen-units=1 -C relocation-model=static \
+		-C strip=symbols -o $@ $<
+
+$(GO_BIN): src/go-proof/main.go
+	@mkdir -p $(OUT)
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+		-ldflags='-s -w -buildid=' -o $@ $<
+
 # ── initramfs ───────────────────────────────────────────────────────────
 initramfs: $(INITRAMFS)
 
-$(INITRAMFS): $(BUSYBOX_BIN) $(INIT_BIN) scripts/mkinitramfs.sh $(shell find rootfs -type f)
-	scripts/mkinitramfs.sh $(B)/rootfs $(BUSYBOX_BIN) $(INIT_BIN) rootfs $@
+$(INITRAMFS): $(BUSYBOX_BIN) $(INIT_BIN) $(TOOLS_BIN) $(GO_BIN) scripts/mkinitramfs.sh $(shell find rootfs -type f)
+	scripts/mkinitramfs.sh $(B)/rootfs $(BUSYBOX_BIN) $(INIT_BIN) $(TOOLS_BIN) $(GO_BIN) rootfs $@
 
 # ── run / test ──────────────────────────────────────────────────────────
 run: $(KERNEL_IMAGE) $(INITRAMFS)
@@ -124,6 +149,14 @@ run: $(KERNEL_IMAGE) $(INITRAMFS)
 
 test: $(KERNEL_IMAGE) $(INITRAMFS)
 	scripts/selftest.sh $(KERNEL_IMAGE) $(INITRAMFS)
+
+test-c:
+	$(MAKE) test INIT_IMPL=c
+
+test-rs:
+	$(MAKE) test INIT_IMPL=rs
+
+test-all: test-c test-rs
 
 boot-budget: $(KERNEL_IMAGE) $(INITRAMFS)
 	REQUIRE_KVM=1 BOOT_BUDGET_MS=$(BOOT_BUDGET_MS) scripts/selftest.sh $(KERNEL_IMAGE) $(INITRAMFS)
@@ -148,7 +181,7 @@ size: $(KERNEL_IMAGE) $(INITRAMFS)
 reproducible:
 	@set -eu; hashes=$$(mktemp); trap 'rm -f "$$hashes"' EXIT; \
 		$(MAKE) clean >/dev/null; $(MAKE) all >/dev/null; \
-		sha256sum $(KERNEL_IMAGE) $(INIT_BIN) $(INITRAMFS) > "$$hashes"; \
+		sha256sum $(KERNEL_IMAGE) $(INIT_BIN) $(TOOLS_BIN) $(GO_BIN) $(INITRAMFS) > "$$hashes"; \
 		$(MAKE) clean >/dev/null; $(MAKE) all >/dev/null; \
 		sha256sum -c "$$hashes"; \
 		echo "reproducible build: PASS"

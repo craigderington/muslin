@@ -1,0 +1,25 @@
+# Minimal bootstrap and interactive shell fallback. Native Muslin tools replace
+# ls, cat, ps, and dmesg; add applets here only when the base system needs them.
+# Dependency defaults are accepted after this fragment is merged.
+CONFIG_STATIC=y
+CONFIG_BUSYBOX=y
+CONFIG_FEATURE_PREFER_APPLETS=y
+CONFIG_SH_IS_ASH=y
+CONFIG_ASH=y
+CONFIG_ASH_JOB_CONTROL=y
+CONFIG_ASH_ALIAS=y
+CONFIG_ASH_EXPAND_PRMT=y
+CONFIG_ASH_ECHO=y
+CONFIG_ASH_PRINTF=y
+CONFIG_ASH_TEST=y
+CONFIG_ASH_GETOPTS=y
+CONFIG_FEATURE_EDITING=y
+CONFIG_FEATURE_TAB_COMPLETION=y
+CONFIG_FEATURE_EDITING_FANCY_PROMPT=y
+CONFIG_HALT=y
+CONFIG_SLEEP=y
+CONFIG_ECHO=y
+CONFIG_PRINTF=y
+CONFIG_TEST=y
+CONFIG_TRUE=y
+CONFIG_FALSE=y

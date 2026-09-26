@@ -1,3 +1,14 @@
 #!/bin/sh
 # One-shot boot tasks. Keep it fast.
 ip link set lo up 2>/dev/null
+
+case "$(cat /proc/cmdline)" in
+  *muslin.selftest*)
+    ls / >/dev/null &&
+      cat /etc/hostname >/dev/null &&
+      ps >/dev/null &&
+      dmesg >/dev/null &&
+      muslin-go &&
+      echo MUSLIN_USERLAND_OK
+    ;;
+esac
