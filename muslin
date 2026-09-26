@@ -15,6 +15,7 @@ case "${1:-help}" in
   run)    dc run --rm qemu ;;
   test)   dc run --rm builder make test ;;
   test-all) dc run --rm builder make test-all ;;
+  test-network) dc run --rm builder make test-network ;;
   verify) dc run --rm builder make verify-sources ;;
   budget) dc run --rm builder make size boot-budget ;;
   profile) dc run --rm builder make profile ;;
@@ -23,7 +24,7 @@ case "${1:-help}" in
   make)   shift; dc run --rm builder make "$@" ;;
   clean)  dc run --rm builder make clean ;;
   *) cat <<USAGE
-muslin: image | build | run | test | test-all | verify | budget | profile | reproducible | shell | make <target> | clean
+muslin: image | build | run | test | test-all | test-network | verify | budget | profile | reproducible | shell | make <target> | clean
   run → serial console in this terminal. 'poweroff' or Ctrl-A X to leave.
 USAGE
   ;;

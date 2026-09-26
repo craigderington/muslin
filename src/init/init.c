@@ -179,7 +179,6 @@ int main(void)
     reboot(RB_DISABLE_CAD);  /* Ctrl-Alt-Del -> SIGINT to us */
 
     mnt("proc", "/proc", "proc", MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL);
-    mnt("sysfs", "/sys", "sysfs", MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL);
     mnt("devtmpfs", "/dev", "devtmpfs", MS_NOSUID, "mode=0755");
     mnt("devpts", "/dev/pts", "devpts", MS_NOSUID | MS_NOEXEC, "mode=0620,ptmxmode=0666");
     mnt("tmpfs", "/run", "tmpfs", MS_NOSUID | MS_NODEV, "mode=0755");

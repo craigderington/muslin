@@ -1,8 +1,20 @@
 #!/bin/sh
 # One-shot boot tasks. Keep it fast.
-ip link set lo up 2>/dev/null
+cmdline=$(cat /proc/cmdline)
 
-case "$(cat /proc/cmdline)" in
+case "$cmdline" in
+  *muslin.selftest*) ;;
+  *)
+    (
+      ifconfig lo up
+      ifconfig eth0 up
+      udhcpc -i eth0 -q -n -s /etc/udhcpc.script
+      exec muslin-go serve
+    ) >/dev/console 2>&1 &
+    ;;
+esac
+
+case "$cmdline" in
   *muslin.selftest*)
     ls / >/dev/null &&
       cat /etc/hostname >/dev/null &&

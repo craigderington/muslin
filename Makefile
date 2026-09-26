@@ -43,7 +43,7 @@ export KBUILD_BUILD_HOST := muslin
 export KBUILD_BUILD_VERSION := 1
 
 .PHONY: all verify-sources kernel busybox init init-c init-rs tools go-tool initramfs \
-        run test test-c test-rs test-all boot-budget profile size reproducible clean distclean
+        run test test-c test-rs test-all test-network boot-budget profile size reproducible clean distclean
 all: kernel initramfs size
 
 # ── fetch ───────────────────────────────────────────────────────────────
@@ -84,8 +84,12 @@ kernel: $(KERNEL_IMAGE)
 $(KSRC)/Makefile: $(DL)/linux-$(KERNEL_VERSION).verified
 	tar -xf $(DL)/linux-$(KERNEL_VERSION).tar.xz -C $(B) && touch $@
 
-$(KSRC)/.config: $(KSRC)/Makefile config/kernel.fragment
+$(KSRC)/.config: $(KSRC)/Makefile config/kernel.fragment Makefile
 	$(MAKE) -C $(KSRC) tinyconfig
+	cd $(KSRC) && ./scripts/kconfig/merge_config.sh -m .config $(CURDIR)/config/kernel.fragment
+	$(MAKE) -C $(KSRC) olddefconfig
+	# A second pass applies settings whose menus only become visible after the
+	# first pass enables their parent subsystem (notably networking).
 	cd $(KSRC) && ./scripts/kconfig/merge_config.sh -m .config $(CURDIR)/config/kernel.fragment
 	$(MAKE) -C $(KSRC) olddefconfig
 
@@ -157,6 +161,9 @@ test-rs:
 	$(MAKE) test INIT_IMPL=rs
 
 test-all: test-c test-rs
+
+test-network: $(KERNEL_IMAGE) $(INITRAMFS)
+	scripts/network-selftest.sh $(KERNEL_IMAGE) $(INITRAMFS)
 
 boot-budget: $(KERNEL_IMAGE) $(INITRAMFS)
 	REQUIRE_KVM=1 BOOT_BUDGET_MS=$(BOOT_BUDGET_MS) scripts/selftest.sh $(KERNEL_IMAGE) $(INITRAMFS)

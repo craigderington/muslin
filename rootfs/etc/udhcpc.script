@@ -1,0 +1,16 @@
+#!/bin/sh
+# Apply the lease offered by QEMU's user-mode DHCP server.
+set -eu
+
+case "$1" in
+  deconfig)
+    ifconfig "$interface" 0.0.0.0
+    ;;
+  bound|renew)
+    ifconfig "$interface" "$ip" netmask "${subnet:-255.255.255.0}" \
+      broadcast "${broadcast:-+}"
+    if [ -n "${router:-}" ]; then
+      route add default gw "${router%% *}" dev "$interface"
+    fi
+    ;;
+esac

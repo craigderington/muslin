@@ -27,10 +27,13 @@ Loop: Plan → Work → Assess → Build → Test → Deploy → Iterate
 - [x] Static Go proof binary (`CGO_ENABLED=0`) shipped and executed by the in-guest selftest
 - [x] C image remains inside the 1 MiB initramfs budget (**897,657 bytes**); experimental Rust PID 1 image is **1,102,160 bytes**
 
-## Sprint 4: Networking
-- [ ] virtio-net in the kernel fragment, `udhcpc` or our own DHCP client
-- [ ] QEMU `hostfwd` on a random port (e.g. host 4217 → guest 22/80)
-- [ ] Tiny static HTTP status page served from the guest
+## Sprint 4: Networking ✅
+- [x] Minimal IPv4/TCP + virtio-net kernel and BusyBox `udhcpc`; guest obtains **10.0.2.15** from QEMU
+- [x] Loopback-only QEMU `hostfwd`, configurable for interactive boots and randomized by the integration test
+- [x] Tiny raw-socket HTTP status service in the static Go binary, served on guest port 80
+- [x] End-to-end `./muslin test-network` boots, leases, curls the forwarded endpoint, and cleans up QEMU
+- [x] Budgets retained: **1,557,504-byte kernel**, **931,466-byte C initramfs**, and **90 ms** boot selftest
+- [x] BusyBox remains minimal at **12 applets** (three added for networking: `ifconfig`, `route`, `udhcpc`)
 
 ## Sprint 5: Persistence & packages
 - [ ] virtio-blk + ext4 disk image, `switch_root` from initramfs
