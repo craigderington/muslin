@@ -1,0 +1,6 @@
+#!/bin/sh
+# PID 1 runs service shutdown hooks before signalling the remaining processes.
+set -eu
+if [ -x /etc/init.d/postgresql ]; then
+    /etc/init.d/postgresql stop
+fi

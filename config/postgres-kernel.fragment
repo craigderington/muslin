@@ -1,0 +1,6 @@
+# PostgreSQL's Linux IPC, local socket and latch implementations.
+CONFIG_SYSVIPC=y
+CONFIG_UNIX=y
+CONFIG_EPOLL=y
+CONFIG_EVENTFD=y
+CONFIG_SIGNALFD=y

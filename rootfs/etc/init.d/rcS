@@ -3,7 +3,17 @@
 cmdline=$(cat /proc/cmdline)
 
 case "$cmdline" in
-  *muslin.selftest*) ;;
+  *muslin.postgres*)
+    if [ ! -f /var/lib/mpkg/postgresql/manifest ]; then
+      mpkg install /var/lib/muslin/postgresql.mpkg || exit 1
+    fi
+    /etc/init.d/postgresql start || exit 1
+    echo MUSLIN_POSTGRES_READY
+    ;;
+esac
+
+case "$cmdline" in
+  *muslin.selftest*|*muslin.persisttest*|*muslin.packagetest*|*muslin.acceptance*) ;;
   *)
     (
       ifconfig lo up
@@ -11,6 +21,13 @@ case "$cmdline" in
       udhcpc -i eth0 -q -n -s /etc/udhcpc.script
       exec muslin-go serve
     ) >/dev/console 2>&1 &
+    ;;
+esac
+
+case "$cmdline" in
+  *muslin.packagetest*)
+    mpkg install /var/lib/muslin/test.mpkg /var/lib/muslin/test.mpkg.sha256 &&
+      /usr/bin/muslin-hello
     ;;
 esac
 

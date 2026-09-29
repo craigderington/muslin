@@ -31,6 +31,12 @@ CONFIG_VIRTIO_MENU=y
 CONFIG_VIRTIO_PCI=y
 CONFIG_VIRTIO_NET=y
 # CONFIG_VIRTIO_PCI_LEGACY is not set
+# Persistent root disk.
+CONFIG_BLOCK=y
+CONFIG_VIRTIO_BLK=y
+CONFIG_EXT4_FS=y
+# mpkg serializes transactions with advisory locks released on process exit.
+CONFIG_FILE_LOCKING=y
 # Networking defaults pull in several server-sized subsystems; Muslin needs
 # only IPv4/TCP and one virtio NIC here.
 # CONFIG_IPV6 is not set

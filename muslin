@@ -16,6 +16,12 @@ case "${1:-help}" in
   test)   dc run --rm builder make test ;;
   test-all) dc run --rm builder make test-all ;;
   test-network) dc run --rm builder make test-network ;;
+  test-persistence) dc run --rm builder make test-persistence ;;
+  test-package) dc run --rm builder make test-package ;;
+  test-s5) dc run --rm builder make test-s5 ;;
+  postgres) shift; dc run --rm builder make postgres "$@" ;;
+  run-postgres) dc run --rm qemu make run-postgres ;;
+  test-postgres) dc run --rm builder make test-postgres-all ;;
   verify) dc run --rm builder make verify-sources ;;
   budget) dc run --rm builder make size boot-budget ;;
   profile) dc run --rm builder make profile ;;
@@ -24,7 +30,7 @@ case "${1:-help}" in
   make)   shift; dc run --rm builder make "$@" ;;
   clean)  dc run --rm builder make clean ;;
   *) cat <<USAGE
-muslin: image | build | run | test | test-all | test-network | verify | budget | profile | reproducible | shell | make <target> | clean
+muslin: image | build | run | test | test-all | test-network | test-persistence | test-package | test-s5 | postgres | run-postgres | test-postgres | verify | budget | profile | reproducible | shell | make <target> | clean
   run → serial console in this terminal. 'poweroff' or Ctrl-A X to leave.
 USAGE
   ;;

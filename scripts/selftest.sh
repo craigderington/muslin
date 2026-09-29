@@ -2,9 +2,11 @@
 # Boot headless, expect MUSLIN_SELFTEST_OK, fail on timeout/panic.
 set -eu
 LOG=$(mktemp)
-APPEND_EXTRA=muslin.selftest timeout "${TIMEOUT:-90}" \
-    "$(dirname "$0")/run-qemu.sh" "$1" "$2" </dev/null >"$LOG" 2>&1 || true
-if grep -a -q MUSLIN_SELFTEST_OK "$LOG" && grep -a -q MUSLIN_USERLAND_OK "$LOG"; then
+status=0
+APPEND_EXTRA="${APPEND_EXTRA:-} muslin.selftest" timeout "${TIMEOUT:-90}" \
+    "$(dirname "$0")/run-qemu.sh" "$1" "$2" </dev/null >"$LOG" 2>&1 || status=$?
+if [ "$status" = 0 ] && ! grep -a -E -q 'Kernel panic|MUSLIN_BOOT_FAILED' "$LOG" && \
+   grep -a -q MUSLIN_SELFTEST_OK "$LOG" && grep -a -q MUSLIN_USERLAND_OK "$LOG"; then
     grep -a MUSLIN_USERLAND_OK "$LOG" | tail -n 1 | tr -d '\r'
     result=$(grep -a MUSLIN_SELFTEST_OK "$LOG" | tail -n 1 | tr -d '\r')
     echo "$result"
@@ -20,5 +22,5 @@ if grep -a -q MUSLIN_SELFTEST_OK "$LOG" && grep -a -q MUSLIN_USERLAND_OK "$LOG";
     fi
     echo "PASS"; rm -f "$LOG"
 else
-    tail -n 30 "$LOG"; echo "FAIL (log: $LOG)"; exit 1
+    tail -n 30 "$LOG"; echo "FAIL (QEMU status: $status, log: $LOG)"; exit 1
 fi

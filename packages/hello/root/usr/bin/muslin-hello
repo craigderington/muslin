@@ -1,0 +1,2 @@
+#!/bin/sh
+echo MUSLIN_PACKAGE_PAYLOAD_OK

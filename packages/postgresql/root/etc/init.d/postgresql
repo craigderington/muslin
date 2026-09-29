@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+PG=/usr/pgsql/bin
+DATA=/var/lib/postgresql/data
+case "${1:-}" in
+    start)
+        if postgres-user "$PG/pg_ctl" -D "$DATA" status >/dev/null 2>&1; then
+            exit 0
+        fi
+        if [ ! -f "$DATA/PG_VERSION" ]; then
+            postgres-user "$PG/initdb" -D "$DATA" --no-locale --encoding=UTF8 \
+                --auth-local=peer --auth-host=reject
+        fi
+        postgres-user "$PG/pg_ctl" -D "$DATA" -l /var/lib/postgresql/server.log \
+            -o '-c config_file=/usr/pgsql/etc/muslin.conf' -w -t 30 start
+        ;;
+    stop)
+        if postgres-user "$PG/pg_ctl" -D "$DATA" status >/dev/null 2>&1; then
+            postgres-user "$PG/pg_ctl" -D "$DATA" -m fast -w -t 20 stop
+            postgres-user "$PG/pg_controldata" "$DATA" |
+                grep -q '^Database cluster state: *shut down$'
+            echo MUSLIN_POSTGRES_STOPPED
+        fi
+        ;;
+    status) exec postgres-user "$PG/pg_ctl" -D "$DATA" status ;;
+    sql) shift; exec postgres-user "$PG/psql" -X -v ON_ERROR_STOP=1 "$@" ;;
+    *) echo 'usage: /etc/init.d/postgresql start|stop|status|sql [psql arguments]' >&2; exit 2 ;;
+esac
