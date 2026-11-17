@@ -1,0 +1,4 @@
+FROM muslin-builder:latest
+RUN apk add --no-cache zig clang lld llvm qemu-system-aarch64 qemu-aarch64
+RUN rustup target add --toolchain 1.78.0 aarch64-unknown-linux-musl
+ENV ZIG_GLOBAL_CACHE_DIR=/tmp/zig-cache

@@ -8,9 +8,14 @@ SOURCE_DATE_EPOCH ?= 1727395200
 BOOT_BUDGET_MS    ?= 500
 INIT_IMPL         ?= c
 
-B     := build
-DL    := $(B)/dl
-OUT   := out
+B     ?= build
+DL    ?= $(B)/dl
+OUT   ?= out
+RUSTC ?= rustc
+RUST_TARGET ?= x86_64-unknown-linux-musl
+GOARCH ?= amd64
+STRIP ?= strip
+KERNEL_FRAGMENT ?= config/kernel.fragment
 KSRC  := $(B)/linux-$(KERNEL_VERSION)
 BBSRC := $(B)/busybox-$(BUSYBOX_VERSION)
 
@@ -155,16 +160,17 @@ verify-sources: $(DL)/linux-$(KERNEL_VERSION).tar.xz $(DL)/linux-$(KERNEL_VERSIO
 kernel: $(KERNEL_IMAGE)
 
 $(KSRC)/Makefile: $(DL)/linux-$(KERNEL_VERSION).verified
+	@mkdir -p $(B)
 	tar -xf $(DL)/linux-$(KERNEL_VERSION).tar.xz -C $(B) && touch $@
 
-$(KSRC)/.config: $(KSRC)/Makefile config/kernel.fragment Makefile
-	$(MAKE) -C $(KSRC) tinyconfig
-	cd $(KSRC) && ./scripts/kconfig/merge_config.sh -m .config $(CURDIR)/config/kernel.fragment
-	$(MAKE) -C $(KSRC) olddefconfig
+$(KSRC)/.config: $(KSRC)/Makefile $(KERNEL_FRAGMENT) Makefile
+	$(MAKE) -C $(KSRC) $(KERNEL_MAKE_FLAGS) tinyconfig
+	cd $(KSRC) && ./scripts/kconfig/merge_config.sh -m .config $(CURDIR)/$(KERNEL_FRAGMENT)
+	$(MAKE) -C $(KSRC) $(KERNEL_MAKE_FLAGS) olddefconfig
 	# A second pass applies settings whose menus only become visible after the
 	# first pass enables their parent subsystem (notably networking).
-	cd $(KSRC) && ./scripts/kconfig/merge_config.sh -m .config $(CURDIR)/config/kernel.fragment
-	$(MAKE) -C $(KSRC) olddefconfig
+	cd $(KSRC) && ./scripts/kconfig/merge_config.sh -m .config $(CURDIR)/$(KERNEL_FRAGMENT)
+	$(MAKE) -C $(KSRC) $(KERNEL_MAKE_FLAGS) olddefconfig
 
 $(OUT)/bzImage: $(KSRC)/.config
 	@mkdir -p $(OUT)
@@ -183,7 +189,7 @@ $(BBSRC)/.config: $(BBSRC)/Makefile config/busybox.fragment scripts/merge-busybo
 	yes '' | $(MAKE) -C $(BBSRC) oldconfig
 
 $(BBSRC)/busybox: $(BBSRC)/.config
-	$(MAKE) -C $(BBSRC) -j$(JOBS) CC="$(CC)"
+	$(MAKE) -C $(BBSRC) -j$(JOBS) CC="$(CC)" $(BUSYBOX_MAKE_FLAGS)
 
 # ── init: our PID 1 ─────────────────────────────────────────────────────
 init: $(INIT_BIN)
@@ -195,23 +201,23 @@ go-tool: $(GO_BIN)
 $(INIT_C_BIN): src/init/init.c
 	@mkdir -p $(OUT)
 	$(CC) -static -Os -Wall -Wextra -Werror -o $@ $<
-	strip $@
+	$(STRIP) $@
 
 $(INIT_RS_BIN): src/init-rs/main.rs
 	@mkdir -p $(OUT)
-	rustc --target x86_64-unknown-linux-musl --edition 2021 \
+	$(RUSTC) --target $(RUST_TARGET) --edition 2021 \
 		-C opt-level=z -C panic=abort -C lto=fat -C codegen-units=1 -C relocation-model=static \
 		-C strip=symbols -o $@ $<
 
 $(TOOLS_BIN): src/tools/main.rs
 	@mkdir -p $(OUT)
-	rustc --target x86_64-unknown-linux-musl --edition 2021 \
+	$(RUSTC) --target $(RUST_TARGET) --edition 2021 \
 		-C opt-level=z -C panic=abort -C lto=fat -C codegen-units=1 -C relocation-model=static \
 		-C strip=symbols -o $@ $<
 
 $(MPKG_BIN): src/mpkg/main.rs
 	@mkdir -p $(OUT)
-	rustc --target x86_64-unknown-linux-musl --edition 2021 \
+	$(RUSTC) --target $(RUST_TARGET) --edition 2021 \
 		-C opt-level=z -C panic=abort -C lto=fat -C codegen-units=1 -C relocation-model=static \
 		-C strip=symbols -o $@ $<
 
@@ -222,7 +228,7 @@ test-mpkg:
 
 $(GO_BIN): src/go-proof/main.go
 	@mkdir -p $(OUT)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(GOARCH) go build -trimpath \
 		-ldflags='-s -w -buildid=' -o $@ $<
 
 # ── initramfs ───────────────────────────────────────────────────────────

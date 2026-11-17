@@ -1,0 +1,36 @@
+# Isolated cross-build: share verified downloads, never x86 build trees.
+B := build/arm64
+DL := build/dl
+OUT := out/arm64
+KERNEL_IMAGE := $(OUT)/Image
+CC := $(CURDIR)/scripts/arm64-cc.sh
+STRIP := llvm-strip
+# Zig supplies musl startup objects; Rust's bundled copies would duplicate them.
+RUSTC := rustc -C linker=$(CC) -C link-self-contained=no
+RUST_TARGET := aarch64-unknown-linux-musl
+GOARCH := arm64
+export BB_RUNNER := qemu-aarch64
+export QEMU_RUNNER := scripts/run-qemu-arm64.sh
+export ZIG_GLOBAL_CACHE_DIR := $(CURDIR)/$(B)/zig-cache
+KERNEL_FRAGMENT := config/arm64-kernel.fragment
+KERNEL_MAKE_FLAGS := ARCH=arm64 LLVM=1
+BUSYBOX_MAKE_FLAGS := ARCH=arm64 AR=llvm-ar NM=llvm-nm STRIP=llvm-strip
+
+include Makefile
+.DEFAULT_GOAL := arm64
+
+$(KERNEL_IMAGE) $(INITRAMFS) $(INIT_C_BIN) $(INIT_RS_BIN) $(TOOLS_BIN) $(GO_BIN): Makefile.arm64
+$(INIT_C_BIN) $(INIT_RS_BIN) $(TOOLS_BIN) $(BUSYBOX_BIN): scripts/arm64-cc.sh
+
+.PHONY: arm64 test-arm64 run-arm64
+arm64: $(KERNEL_IMAGE) $(INITRAMFS)
+test-arm64: arm64
+	scripts/selftest.sh $(KERNEL_IMAGE) $(INITRAMFS)
+	python3 scripts/arm64-console-selftest.py $(KERNEL_IMAGE) $(INITRAMFS)
+run-arm64: arm64
+	scripts/run-qemu-arm64.sh $(KERNEL_IMAGE) $(INITRAMFS)
+
+$(KERNEL_IMAGE): $(KSRC)/.config
+	@mkdir -p $(OUT)
+	$(MAKE) -C $(KSRC) ARCH=arm64 LLVM=1 -j$(JOBS) Image
+	cp $(KSRC)/arch/arm64/boot/Image $@

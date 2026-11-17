@@ -10,7 +10,7 @@ mkdir -p "$STAGE"/bin "$STAGE"/sbin "$STAGE"/usr/bin "$STAGE"/usr/sbin \
          "$STAGE"/root "$STAGE"/etc
 
 cp "$BB" "$STAGE/bin/busybox"
-"$BB" --list-full | while read -r applet; do
+${BB_RUNNER:-} "$BB" --list-full | while read -r applet; do
     case "$applet" in sbin/init|linuxrc|bin/busybox) continue ;; esac
     case "$applet" in */*) ;; *) applet="bin/$applet" ;; esac
     ln -sf /bin/busybox "$STAGE/$applet"
@@ -25,7 +25,7 @@ done
 cp "$GO_TOOL" "$STAGE/bin/muslin-go"
 cp -a "$OVERLAY"/. "$STAGE"/
 
-busybox_applets=$("$BB" --list | wc -l)
+busybox_applets=$(${BB_RUNNER:-} "$BB" --list | wc -l)
 echo "userland: $busybox_applets BusyBox applets + 4 native Rust applets + 1 Go tool"
 
 # cpio stores mtimes; normalize every entry so identical inputs reproduce.

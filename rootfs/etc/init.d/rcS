@@ -13,7 +13,7 @@ case "$cmdline" in
 esac
 
 case "$cmdline" in
-  *muslin.selftest*|*muslin.persisttest*|*muslin.packagetest*|*muslin.acceptance*) ;;
+  *muslin.selftest*|*muslin.persisttest*|*muslin.packagetest*|*muslin.acceptance*|*muslin.offline*) ;;
   *)
     (
       ifconfig lo up

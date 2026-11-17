@@ -1,4 +1,13 @@
 services:
+  arm64:
+    build: { context: ., dockerfile: docker/Dockerfile.arm64 }
+    image: muslin-builder-arm64:latest
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    volumes: [ "./:/muslin" ]
+    stdin_open: true
+    tty: true
+    command: make -f Makefile.arm64 arm64
+
   builder:
     build: { context: ., dockerfile: docker/Dockerfile }
     image: muslin-builder:latest

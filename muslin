@@ -10,7 +10,10 @@ fi
 dc() { docker compose "${files[@]}" "$@"; }
 
 case "${1:-help}" in
-  image)  dc build ;;
+  image)  dc build builder ;;
+  image-arm64) dc build builder; dc build arm64 ;;
+  build-arm64) shift; dc run --rm arm64 make -f Makefile.arm64 arm64 "$@" ;;
+  test-arm64|run-arm64) target=$1; shift; dc run --rm arm64 make -f Makefile.arm64 "$target" "$@" ;;
   build)  shift; dc run --rm builder make all "$@" ;;
   run)    dc run --rm qemu ;;
   test)   dc run --rm builder make test ;;
@@ -31,6 +34,7 @@ case "${1:-help}" in
   clean)  dc run --rm builder make clean ;;
   *) cat <<USAGE
 muslin: image | build | run | test | test-all | test-network | test-persistence | test-package | test-s5 | postgres | run-postgres | test-postgres | verify | budget | profile | reproducible | shell | make <target> | clean
+  ARM64: image-arm64 | build-arm64 | test-arm64 | run-arm64
   run → serial console in this terminal. 'poweroff' or Ctrl-A X to leave.
 USAGE
   ;;

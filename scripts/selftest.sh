@@ -4,7 +4,7 @@ set -eu
 LOG=$(mktemp)
 status=0
 APPEND_EXTRA="${APPEND_EXTRA:-} muslin.selftest" timeout "${TIMEOUT:-90}" \
-    "$(dirname "$0")/run-qemu.sh" "$1" "$2" </dev/null >"$LOG" 2>&1 || status=$?
+    "${QEMU_RUNNER:-$(dirname "$0")/run-qemu.sh}" "$1" "$2" </dev/null >"$LOG" 2>&1 || status=$?
 if [ "$status" = 0 ] && ! grep -a -E -q 'Kernel panic|MUSLIN_BOOT_FAILED' "$LOG" && \
    grep -a -q MUSLIN_SELFTEST_OK "$LOG" && grep -a -q MUSLIN_USERLAND_OK "$LOG"; then
     grep -a MUSLIN_USERLAND_OK "$LOG" | tail -n 1 | tr -d '\r'
