@@ -179,8 +179,13 @@ static void persistence_test(void)
 static void resolve_console(void)
 {
     char buf[256], *last;
-    if (read_file("/sys/class/tty/console/active", buf, sizeof buf) <= 0)
+    if (read_file("/sys/class/tty/console/active", buf, sizeof buf) <= 0) {
+        if (cmdline_value("console=", buf, sizeof buf)) {
+            buf[strcspn(buf, ",")] = '\0';
+            snprintf(console_path, sizeof console_path, "/dev/%s", buf);
+        }
         return;
+    }
     last = strrchr(buf, ' ');
     last = last ? last + 1 : buf;
     if (*last)

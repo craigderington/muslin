@@ -106,6 +106,13 @@ fn console_path() -> String {
     fs::read_to_string("/sys/class/tty/console/active")
         .ok()
         .and_then(|active| active.split_whitespace().last().map(str::to_owned))
+        .or_else(|| {
+            fs::read_to_string("/proc/cmdline").ok()?
+                .split_whitespace()
+                .filter_map(|word| word.strip_prefix("console="))
+                .next()
+                .map(|name| name.split(',').next().unwrap_or(name).to_owned())
+        })
         .map(|name| format!("/dev/{name}"))
         .unwrap_or_else(|| "/dev/console".to_owned())
 }
