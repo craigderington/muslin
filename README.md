@@ -59,6 +59,29 @@ curl http://127.0.0.1:8080/
 | `Makefile` | The real build; runs in the container or on any musl host |
 | `compose*.yml`, `docker/` | Builder image; KVM layered in automatically |
 
+## ARM64 on QEMU
+
+The ARM64 milestone cross-builds the kernel, static musl C init, Rust tools,
+and Go proof binary on the x86 builder, then boots an initramfs on QEMU `virt`:
+
+```
+./muslin image-arm64
+./muslin build-arm64
+./muslin test-arm64
+./muslin run-arm64
+```
+
+Build trees live in `build/arm64/`, artifacts in `out/arm64/`; only verified
+source downloads are shared with x86. The separate builder adds LLVM, Zig's
+musl cross-compiler, the Rust ARM64 target, and QEMU. BusyBox runs through
+`qemu-aarch64` during initramfs assembly. The guest uses TCG, a PL011 console
+(`ttyAMA0`), and PSCI reboot/poweroff. `test-arm64` checks native userland,
+reboot, interactive shell job control, and poweroff.
+
+Use `./muslin test-arm64 INIT_IMPL=rs` to check the experimental Rust PID 1.
+This initial ARM profile has no networking, persistent disk, packages, or
+PostgreSQL. Real hardware and ARM size/boot budgets remain future work.
+
 ## Swap parts
 ```
 make test CC=musl-gcc KERNEL_IMAGE=/boot/vmlinuz BUSYBOX_BIN=/bin/busybox

@@ -2,6 +2,30 @@
 
 Loop: Plan → Work → Assess → Build → Test → Deploy → Iterate
 
+## Resume point (2026-11-17)
+- ARM64 initramfs cross-build and QEMU `virt` boot are complete. Both C and Rust
+  PID 1 passed native-userland/reboot and interactive-console/job-control/poweroff
+  tests with `./muslin test-arm64` (440/460 ms under TCG).
+  Logs: `/tmp/muslin-test-arm64.log`, `/tmp/muslin-test-arm64-rs.log`.
+- ARM artifacts/build trees are isolated under `out/arm64/` and `build/arm64/`.
+  Kernel: 3,203,080 bytes; C initramfs: 922,111 bytes. ARM networking, disks,
+  packages, PostgreSQL, hardware support, and size/boot budget gates are deferred.
+- Next: choose the real-hardware target (Raspberry Pi or an old laptop).
+- Shared build/console changes passed x86 C and Rust boot tests (120/150 ms).
+  Full output: `/tmp/muslin-test-x86-regression.log`.
+
+## Sprint 5 verification (2026-11-12)
+- Working tree started clean at `48ddcb2`; Sprint 5 verification is now complete.
+- The Docker builder was rebuilt successfully with `./muslin image`.
+- `./muslin test-s5` passed for C and Rust init: nine installer unit tests,
+  reproducible disk metadata, state isolation, boot, networking, persistence,
+  package validation/install/reboot, and disk-root failures. Boot times: C 220 ms,
+  Rust 230 ms. Full output: `/tmp/muslin-test-s5.log`.
+- `./muslin test-postgres` passed for both init implementations: package install,
+  UID/GID 70, PL/pgSQL, 1,000 committed rows surviving reboot, active transaction
+  rollback, clean reboot/poweroff, and profile size budgets.
+  Full output: `/tmp/muslin-test-postgres.log`.
+
 ## Sprint 1: Boot to a shell ✅ (verified in Claude's sandbox)
 - [x] Repo scaffold, compose builder (Alpine = musl-native toolchain)
 - [x] `muslin-init` PID 1 in C: mounts, real ctty, rcS, respawn, reaping, halt/poweroff/reboot
@@ -35,11 +59,11 @@ Loop: Plan → Work → Assess → Build → Test → Deploy → Iterate
 - [x] Budgets retained: **1,557,504-byte kernel**, **931,466-byte C initramfs**, and **90 ms** boot selftest
 - [x] BusyBox remains minimal at **12 applets** (three added for networking: `ifconfig`, `route`, `udhcpc`)
 
-## Sprint 5: Persistence & packages
-- [ ] virtio-blk + ext4 disk image, `switch_root` from initramfs
-- [ ] Package format: tar.zst + manifest + sha256, `mpkg install`
-- [ ] Stretch: Postgres built against musl, running inside Muslin 😈
+## Sprint 5: Persistence & packages ✅ (verified 2026-11-12)
+- [x] virtio-blk + ext4 disk image, `switch_root` from initramfs
+- [x] Package format: tar.zst + manifest + sha256, `mpkg install`
+- [x] Stretch: Postgres built against musl, running inside Muslin 😈
 
 ## Sprint 6: Beyond x86
-- [ ] aarch64 cross build, boot on `qemu-system-aarch64 -M virt`
+- [x] aarch64 cross build, boot on `qemu-system-aarch64 -M virt` (C/Rust init, verified 2026-11-17)
 - [ ] Real hardware: Raspberry Pi or an old laptop on a USB stick
