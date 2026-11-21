@@ -75,6 +75,7 @@ struct Package<'a> {
     name: String,
     version: String,
     manifest: &'a [u8],
+    dependencies: BTreeSet<&'a str>,
     files: BTreeMap<String, Entry<'a>>,
 }
 fn parse_tar(archive: &[u8]) -> Result<Package<'_>> {
@@ -192,7 +193,7 @@ fn parse_tar(archive: &[u8]) -> Result<Package<'_>> {
     for line in text(manifest.data)?.lines() {
         let (key, value) = line.split_once('=').ok_or("invalid manifest")?;
         ensure(
-            matches!(key, "name" | "version") && token(value),
+            matches!(key, "name" | "version" | "depends") && (key == "depends" || token(value)),
             "invalid manifest field",
         )?;
         ensure(
@@ -202,6 +203,15 @@ fn parse_tar(archive: &[u8]) -> Result<Package<'_>> {
     }
     let name = values.get("name").ok_or("missing name")?.to_string();
     let version = values.get("version").ok_or("missing version")?.to_string();
+    let mut dependencies = BTreeSet::new();
+    if let Some(value) = values.get("depends") {
+        for dependency in value.split(',') {
+            ensure(
+                token(dependency) && dependency != name && dependencies.insert(dependency),
+                "invalid or duplicate dependency",
+            )?;
+        }
+    }
     let mut files = BTreeMap::new();
     for (path, entry) in entries {
         if path == "root" {
@@ -232,6 +242,7 @@ fn parse_tar(archive: &[u8]) -> Result<Package<'_>> {
         name,
         version,
         manifest: manifest.data,
+        dependencies,
         files,
     })
 }
@@ -325,6 +336,13 @@ fn install(root: &Path, package: &Package<'_>) -> Result<()> {
         !db.join(&package.name).exists() && !db.join(format!("{}.manifest", package.name)).exists(),
         "package already installed; upgrades are unsupported",
     )?;
+    for dependency in &package.dependencies {
+        let installed = db.join(dependency).join("manifest");
+        ensure(
+            installed.is_file(),
+            &format!("missing dependency: {dependency}"),
+        )?;
+    }
     for path in package.files.keys() {
         directories(
             root,
@@ -505,6 +523,26 @@ mod tests {
         assert_eq!(p.name, "demo");
         assert_eq!(p.files["usr/bin/demo"].data, b"hello\n");
     }
+    #[test]
+    fn requires_dependencies_before_installing() {
+        let root = Temp::new();
+        let data = archive(&[
+            ("manifest", b'0', b"name=app\nversion=1\ndepends=demo\n"),
+            ("files", b'0', b"/usr/bin/app\n"),
+            ("root/usr/bin/app", b'0', b"app\n"),
+        ]);
+        let app = parse_tar(&data).unwrap();
+        assert!(install(&root.0, &app)
+            .unwrap_err()
+            .to_string()
+            .contains("missing dependency: demo"));
+        assert!(!root.0.join("usr/bin/app").exists());
+        let demo = fixture(b"/usr/bin/demo\n", "root/usr/bin/demo", b'0');
+        install(&root.0, &parse_tar(&demo).unwrap()).unwrap();
+        install(&root.0, &app).unwrap();
+        assert!(root.0.join("usr/bin/app").is_file());
+    }
+
     #[test]
     fn rejects_omitted_and_extra_file_list_entries() {
         for files in [

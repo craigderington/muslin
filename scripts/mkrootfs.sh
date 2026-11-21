@@ -11,15 +11,21 @@ DISK_STAGE=$(mktemp -d)
 TEMP=$(mktemp "$OUT.XXXXXX")
 trap 'rm -rf "$DISK_STAGE"; rm -f "$TEMP"' EXIT INT TERM
 
-gzip -dc "$INITRAMFS" >"$DISK_STAGE/archive.cpio"
+case "$INITRAMFS" in
+    *.xz) xz -dc "$INITRAMFS" ;;
+    *) gzip -dc "$INITRAMFS" ;;
+esac >"$DISK_STAGE/archive.cpio"
 (cd "$DISK_STAGE" && cpio -id --quiet --no-preserve-owner <archive.cpio)
 rm "$DISK_STAGE/archive.cpio"
 mkdir -p "$DISK_STAGE/var/lib/muslin" "$DISK_STAGE/usr/bin" "$DISK_STAGE/usr/lib" "$DISK_STAGE/lib"
 # These dependencies are disk-only, leaving the bootstrap image small.
 cp "$MPKG" "$DISK_STAGE/usr/bin/mpkg"
-cp /usr/bin/zstd "$DISK_STAGE/usr/bin/zstd"
-cp -L /usr/lib/libzstd.so.1 "$DISK_STAGE/usr/lib/libzstd.so.1"
-cp /lib/ld-musl-x86_64.so.1 "$DISK_STAGE/lib/ld-musl-x86_64.so.1"
+cp "${GUEST_SYSROOT:-}/usr/bin/zstd" "$DISK_STAGE/usr/bin/zstd"
+cp -L "${GUEST_SYSROOT:-}/usr/lib/libzstd.so.1" "$DISK_STAGE/usr/lib/libzstd.so.1"
+cp "${GUEST_SYSROOT:-}/lib/ld-musl-${GUEST_ARCH:-x86_64}.so.1" "$DISK_STAGE/lib/"
+if [ "${GUEST_ARCH:-x86_64}" = aarch64 ]; then
+    cp -P "$GUEST_SYSROOT/lib/libc.musl-aarch64.so.1" "$DISK_STAGE/lib/"
+fi
 if [ -n "${5:-}" ]; then
     cp -a "$5"/. "$DISK_STAGE"/
 fi

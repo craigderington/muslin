@@ -16,7 +16,7 @@ debugfs -w -R "write $PACKAGE /var/lib/muslin/test.mpkg" "$DISK" >/dev/null 2>&1
 debugfs -w -R "write $PACKAGE.sha256 /var/lib/muslin/test.mpkg.sha256" "$DISK" >/dev/null 2>&1
 
 DISK_IMAGE=$DISK APPEND_EXTRA="muslin.root=/dev/vda muslin.packagetest" \
-    timeout "${TIMEOUT:-30}" "$(dirname "$0")/run-qemu.sh" \
+    timeout "${TIMEOUT:-30}" "${QEMU_RUNNER:-$(dirname "$0")/run-qemu.sh}" \
     "$KERNEL" "$INITRD" </dev/null >"$LOG" 2>&1 || {
         tail -n 50 "$LOG"; echo 'FAIL: guest did not exit cleanly'; exit 1;
     }

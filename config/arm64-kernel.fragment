@@ -1,4 +1,4 @@
-# QEMU virt, PL011 serial console, PSCI reboot/poweroff; initramfs only.
+# QEMU virt, PL011 serial console, PSCI reboot/poweroff.
 CONFIG_64BIT=y
 CONFIG_PRINTK=y
 CONFIG_MULTIUSER=y
@@ -6,6 +6,7 @@ CONFIG_FUTEX=y
 CONFIG_POSIX_TIMERS=y
 CONFIG_BLK_DEV_INITRD=y
 CONFIG_RD_GZIP=y
+CONFIG_RD_XZ=y
 CONFIG_BINFMT_ELF=y
 CONFIG_BINFMT_SCRIPT=y
 CONFIG_TTY=y
@@ -20,3 +21,19 @@ CONFIG_ARM_PSCI_FW=y
 # CONFIG_SYSFS is not set
 # CONFIG_VT is not set
 # CONFIG_INPUT is not set
+
+# QEMU virt exposes the network device over virtio MMIO.
+CONFIG_NET=y
+CONFIG_PACKET=y
+CONFIG_INET=y
+CONFIG_NETDEVICES=y
+CONFIG_VIRTIO_MENU=y
+CONFIG_VIRTIO_MMIO=y
+CONFIG_VIRTIO_NET=y
+# CONFIG_IPV6 is not set
+
+# Persistent root and advisory locks for mpkg.
+CONFIG_BLOCK=y
+CONFIG_VIRTIO_BLK=y
+CONFIG_EXT4_FS=y
+CONFIG_FILE_LOCKING=y

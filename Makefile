@@ -27,7 +27,7 @@ TOOLS_BIN    := $(OUT)/muslin-tools
 GO_BIN       := $(OUT)/muslin-go
 MPKG_BIN     := $(OUT)/mpkg
 INIT_BIN     := $(OUT)/init-$(INIT_IMPL)
-INITRAMFS    := $(OUT)/initramfs-$(INIT_IMPL).cpio.gz
+INITRAMFS    := $(OUT)/initramfs-$(INIT_IMPL).cpio.$(if $(filter rs,$(INIT_IMPL)),xz,gz)
 ROOTFS_IMAGE := $(OUT)/base-$(INIT_IMPL).ext4
 RUNTIME_DISK := state/rootfs-$(INIT_IMPL).ext4
 ROOTFS_SIZE_MB ?= 32
@@ -37,7 +37,10 @@ POSTGRES_VERSION := 18.6
 POSTGRES_SHA256 := 555610c24d53e4316da5b7d3fc25c279d96856d5e0e23ee308c328c5fa881d9f
 POSTGRES_ARCHIVE := $(DL)/postgresql-$(POSTGRES_VERSION).tar.bz2
 POSTGRES_PACKAGE := $(OUT)/postgresql-$(POSTGRES_VERSION).mpkg
-POSTGRES_KERNEL := $(OUT)/bzImage-postgres
+POSTGRES_KERNEL ?= $(OUT)/bzImage-postgres
+KERNEL_BOOT_TARGET ?= bzImage
+KERNEL_BOOT_PATH ?= arch/x86/boot/bzImage
+QEMU_RUNNER ?= scripts/run-qemu.sh
 POSTGRES_KSRC := $(B)/linux-$(KERNEL_VERSION)-postgres
 POSTGRES_BASE := $(OUT)/postgres-$(INIT_IMPL).ext4
 POSTGRES_RUNTIME := state/postgres-$(INIT_IMPL).ext4
@@ -80,7 +83,7 @@ $(POSTGRES_ARCHIVE):
 # Verification happens on every recipe invocation, before extraction/build.
 $(POSTGRES_PACKAGE) $(POSTGRES_PACKAGE).sha256 &: $(POSTGRES_ARCHIVE) Makefile scripts/build-postgres.sh scripts/mkpackage.sh src/postgres-user/main.c $(shell find packages/postgresql/root)
 	@mkdir -p $(OUT)
-	JOBS=$(JOBS) scripts/build-postgres.sh $(POSTGRES_ARCHIVE) $(POSTGRES_SHA256) $(POSTGRES_VERSION) $(B)/postgres $(POSTGRES_PACKAGE)
+	JOBS=$(JOBS) CC="$(CC)" STRIP="$(STRIP)" scripts/build-postgres.sh $(POSTGRES_ARCHIVE) $(POSTGRES_SHA256) $(POSTGRES_VERSION) $(B)/postgres $(POSTGRES_PACKAGE)
 
 # A separate source/build tree keeps the tiny base kernel untouched.
 $(POSTGRES_KSRC)/Makefile: $(DL)/linux-$(KERNEL_VERSION).verified
@@ -88,17 +91,17 @@ $(POSTGRES_KSRC)/Makefile: $(DL)/linux-$(KERNEL_VERSION).verified
 	tar -xf $(DL)/linux-$(KERNEL_VERSION).tar.xz -C $(POSTGRES_KSRC) --strip-components=1
 	@touch $@
 
-$(POSTGRES_KSRC)/.config: $(POSTGRES_KSRC)/Makefile config/kernel.fragment config/postgres-kernel.fragment
-	$(MAKE) -C $(POSTGRES_KSRC) tinyconfig
-	cd $(POSTGRES_KSRC) && ./scripts/kconfig/merge_config.sh -m .config $(CURDIR)/config/kernel.fragment $(CURDIR)/config/postgres-kernel.fragment
-	$(MAKE) -C $(POSTGRES_KSRC) olddefconfig
-	cd $(POSTGRES_KSRC) && ./scripts/kconfig/merge_config.sh -m .config $(CURDIR)/config/kernel.fragment $(CURDIR)/config/postgres-kernel.fragment
-	$(MAKE) -C $(POSTGRES_KSRC) olddefconfig
+$(POSTGRES_KSRC)/.config: $(POSTGRES_KSRC)/Makefile $(KERNEL_FRAGMENT) config/postgres-kernel.fragment
+	$(MAKE) -C $(POSTGRES_KSRC) $(KERNEL_MAKE_FLAGS) tinyconfig
+	cd $(POSTGRES_KSRC) && ./scripts/kconfig/merge_config.sh -m .config $(CURDIR)/$(KERNEL_FRAGMENT) $(CURDIR)/config/postgres-kernel.fragment
+	$(MAKE) -C $(POSTGRES_KSRC) $(KERNEL_MAKE_FLAGS) olddefconfig
+	cd $(POSTGRES_KSRC) && ./scripts/kconfig/merge_config.sh -m .config $(CURDIR)/$(KERNEL_FRAGMENT) $(CURDIR)/config/postgres-kernel.fragment
+	$(MAKE) -C $(POSTGRES_KSRC) $(KERNEL_MAKE_FLAGS) olddefconfig
 
 $(POSTGRES_KERNEL): $(POSTGRES_KSRC)/.config
 	@mkdir -p $(OUT)
-	$(MAKE) -C $(POSTGRES_KSRC) -j$(JOBS) bzImage
-	cp $(POSTGRES_KSRC)/arch/x86/boot/bzImage $@
+	$(MAKE) -C $(POSTGRES_KSRC) $(KERNEL_MAKE_FLAGS) -j$(JOBS) $(KERNEL_BOOT_TARGET)
+	cp $(POSTGRES_KSRC)/$(KERNEL_BOOT_PATH) $@
 
 $(POSTGRES_BASE): $(INITRAMFS) $(MPKG_BIN) $(POSTGRES_PACKAGE) $(POSTGRES_PACKAGE).sha256 scripts/mkrootfs.sh scripts/normalize-ext4.py
 	@set -eu; overlay=$$(mktemp -d); trap 'rm -rf "$$overlay"' EXIT; \
@@ -115,7 +118,7 @@ postgres-size: $(POSTGRES_KERNEL) $(POSTGRES_BASE)
 run-postgres: postgres
 	@scripts/prepare-runtime.sh $(POSTGRES_BASE) $(POSTGRES_RUNTIME)
 	DISK_IMAGE=$(POSTGRES_RUNTIME) MEM=256M APPEND_EXTRA="muslin.root=/dev/vda muslin.postgres" \
-		scripts/run-qemu.sh $(POSTGRES_KERNEL) $(INITRAMFS)
+		$(QEMU_RUNNER) $(POSTGRES_KERNEL) $(INITRAMFS)
 
 test-postgres: postgres
 	python3 scripts/postgres-selftest.py $(POSTGRES_KERNEL) $(INITRAMFS) $(POSTGRES_BASE)
@@ -287,8 +290,8 @@ test-s5: test-mpkg
 	python3 scripts/build-selftest.py $(OUT)
 	$(MAKE) -j1 test test-network test-persistence test-package size INIT_IMPL=c
 	python3 scripts/s5-selftest.py $(KERNEL_IMAGE) $(OUT)/initramfs-c.cpio.gz $(OUT)/base-c.ext4
-	$(MAKE) -j1 test test-network test-persistence test-package INIT_IMPL=rs
-	python3 scripts/s5-selftest.py $(KERNEL_IMAGE) $(OUT)/initramfs-rs.cpio.gz $(OUT)/base-rs.ext4
+	$(MAKE) -j1 test test-network test-persistence test-package size INIT_IMPL=rs
+	python3 scripts/s5-selftest.py $(KERNEL_IMAGE) $(OUT)/initramfs-rs.cpio.xz $(OUT)/base-rs.ext4
 
 boot-budget: $(KERNEL_IMAGE) $(INITRAMFS)
 	REQUIRE_KVM=1 BOOT_BUDGET_MS=$(BOOT_BUDGET_MS) scripts/selftest.sh $(KERNEL_IMAGE) $(INITRAMFS)

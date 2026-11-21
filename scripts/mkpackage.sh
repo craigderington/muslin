@@ -1,22 +1,27 @@
 #!/bin/sh
-# mkpackage.sh NAME VERSION ROOT OUT
+# mkpackage.sh NAME VERSION ROOT OUT [DEPENDENCY,DEPENDENCY,...]
 set -eu
 
 NAME=${1:?name}
 VERSION=${2:?version}
 ROOT=${3:?root}
 OUT=${4:?output}
+DEPENDS=${5:-}
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT INT TERM
 
 mkdir -p "$WORK/root"
 cp -a "$ROOT"/. "$WORK/root"/
 find "$WORK/root" -exec touch -h -d "@${SOURCE_DATE_EPOCH:-0}" {} +
-python3 - "$NAME" "$VERSION" "$WORK/root" >"$WORK/files" <<'PY'
+python3 - "$NAME" "$VERSION" "$DEPENDS" "$WORK/root" >"$WORK/files" <<'PY'
 import pathlib, re, sys
-name, version, source = sys.argv[1:]
+name, version, depends, source = sys.argv[1:]
 if not all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+-]{0,63}', v) for v in (name, version)):
     raise SystemExit('invalid package name/version')
+dependencies = depends.split(',') if depends else []
+if (name in dependencies or len(set(dependencies)) != len(dependencies)
+        or any(not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+-]{0,63}', v) for v in dependencies)):
+    raise SystemExit('invalid package dependencies')
 root = pathlib.Path(source)
 for path in sorted(root.rglob('*')):
     relative = path.relative_to(root).as_posix()
@@ -32,6 +37,9 @@ PY
 {
   echo "name=$NAME"
   echo "version=$VERSION"
+  if [ -n "$DEPENDS" ]; then
+    echo "depends=$DEPENDS"
+  fi
 } >"$WORK/manifest"
 touch -d "@${SOURCE_DATE_EPOCH:-0}" "$WORK/manifest" "$WORK/files"
 

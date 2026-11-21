@@ -17,11 +17,24 @@ if [ ! -f "$WORK/source-$VERSION/configure" ]; then
 fi
 mkdir -p "$WORK/build-$VERSION"
 cd "$WORK/build-$VERSION"
-"$WORK/source-$VERSION/configure" --prefix=/usr/pgsql \
+HELPER_CC=${CC:-cc}
+CC=$HELPER_CC
+STRIP=${STRIP:-strip}
+LDFLAGS=-Wl,--build-id=none
+export CC STRIP
+set --
+if [ "${GUEST_ARCH:-x86_64}" = aarch64 ]; then
+    CC="clang --target=aarch64-alpine-linux-musl --sysroot=$GUEST_SYSROOT --gcc-toolchain=$GUEST_SYSROOT/usr"
+    LDFLAGS="$LDFLAGS -fuse-ld=lld"
+    # The configure probe skips runtime linker checks when cross-compiling.
+    set -- --build=x86_64-linux-musl --host=aarch64-linux-musl \
+        --with-system-tzdata=/usr/share/zoneinfo LDFLAGS_EX_BE=-Wl,--export-dynamic
+fi
+"$WORK/source-$VERSION/configure" "$@" --prefix=/usr/pgsql \
     --disable-nls --without-icu --without-readline --without-zlib \
     --without-lz4 --without-zstd --without-libxml --without-libxslt \
     --without-openssl --without-systemd --without-liburing --disable-rpath \
-    CFLAGS="-Os -ffile-prefix-map=$WORK=/build/postgresql" LDFLAGS='-Wl,--build-id=none'
+    CFLAGS="-Os -ffile-prefix-map=$WORK=/build/postgresql" LDFLAGS="$LDFLAGS"
 env MAKELEVEL=0 make -j"${JOBS:-2}"
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT INT TERM
@@ -37,14 +50,20 @@ for lib in plpgsql.so dict_snowball.so; do
 done
 cp -a "$STAGE/install/usr/pgsql/share" "$ROOT/usr/pgsql/"
 cp "$WORK/source-$VERSION/COPYRIGHT" "$ROOT/usr/pgsql/share/COPYRIGHT"
-cc -static -Os -Wall -Wextra -Werror -o "$ROOT/usr/bin/postgres-user" "$REPO/src/postgres-user/main.c"
-strip "$ROOT/usr/bin/postgres-user"
+"$HELPER_CC" -static -Os -Wall -Wextra -Werror -o "$ROOT/usr/bin/postgres-user" "$REPO/src/postgres-user/main.c"
+"$STRIP" "$ROOT/usr/bin/postgres-user"
+if [ "${GUEST_ARCH:-x86_64}" = aarch64 ]; then
+    mkdir -p "$ROOT/usr/share"
+    cp -RL "$GUEST_SYSROOT/usr/share/zoneinfo" "$ROOT/usr/share/"
+    readelf -l "$ROOT/usr/pgsql/bin/postgres" | grep -Fq 'interpreter: /lib/ld-musl-aarch64.so.1]'
+fi
 cp -a "$REPO/packages/postgresql/root"/. "$ROOT"/
 # Fail rather than silently ship a library dependency that the guest lacks.
 for bin in "$ROOT"/usr/pgsql/bin/* "$ROOT"/usr/pgsql/lib/*; do
     readelf -d "$bin" | sed -n 's/.*Shared library: \[\(.*\)\].*/\1/p' |
         while read -r lib; do
-            case "$lib" in libc.musl-x86_64.so.1|libpq.so.5) ;;
+            case "${GUEST_ARCH:-x86_64}:$lib" in
+                *:libpq.so.5|x86_64:libc.musl-x86_64.so.1|aarch64:libc.musl-aarch64.so.1) ;;
                 *) echo "unexpected PostgreSQL runtime dependency: $lib ($bin)" >&2; exit 1;;
             esac
         done

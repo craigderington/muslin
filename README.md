@@ -29,8 +29,8 @@ The optional PostgreSQL source uses a pinned SHA-256 from its official HTTPS
 release archive; upstream does not provide a detached signature alongside that
 archive. Reproducible builds use
 a fixed epoch, kernel identity, build version, filesystem mtimes, cpio inode
-numbers, ordering, and gzip headers. Disk images normalize ownership and all
-inode timestamps, including ctime. Byte-for-byte reproduction assumes the same
+numbers, ordering, and deterministic gzip or XZ compression. Disk images
+normalize ownership and all inode timestamps, including ctime. Byte-for-byte reproduction assumes the same
 builder toolchain; Alpine packages are not pinned independently of the image.
 
 Interactive boots acquire `10.0.2.15` from QEMU over virtio-net and serve a
@@ -68,19 +68,26 @@ and Go proof binary on the x86 builder, then boots an initramfs on QEMU `virt`:
 ./muslin image-arm64
 ./muslin build-arm64
 ./muslin test-arm64
+./muslin test-network-arm64
+./muslin test-storage-arm64
+./muslin test-postgres-arm64
+./muslin budget-arm64
 ./muslin run-arm64
 ```
 
 Build trees live in `build/arm64/`, artifacts in `out/arm64/`; only verified
 source downloads are shared with x86. The separate builder adds LLVM, Zig's
 musl cross-compiler, the Rust ARM64 target, and QEMU. BusyBox runs through
-`qemu-aarch64` during initramfs assembly. The guest uses TCG, a PL011 console
-(`ttyAMA0`), and PSCI reboot/poweroff. `test-arm64` checks native userland,
+`qemu-aarch64` during initramfs assembly. The guest uses QEMU software emulation
+(TCG), a PL011 console (`ttyAMA0`), and PSCI reboot/poweroff. `test-arm64` checks native userland,
 reboot, interactive shell job control, and poweroff.
 
-Use `./muslin test-arm64 INIT_IMPL=rs` to check the experimental Rust PID 1.
-This initial ARM profile has no networking, persistent disk, packages, or
-PostgreSQL. Real hardware and ARM size/boot budgets remain future work.
+Add `INIT_IMPL=rs` to select the Rust PID 1. ARM64 uses virtio MMIO for
+networking and storage. `run-arm64` keeps its writable ext4 disk under
+`state/arm64/` and forwards HTTP to the same loopback-only host port as x86.
+The storage and PostgreSQL tests use disposable disks. `budget-arm64` checks
+a 5 MiB kernel, a 1 MiB initramfs, a 32 MiB disk, and a 1 second boot under TCG.
+Boot timing depends on host speed. Real-hardware boot is deferred.
 
 ## Swap parts
 ```
@@ -94,9 +101,9 @@ Select the PID 1 implementation with `INIT_IMPL`:
 ./muslin make run INIT_IMPL=rs
 ```
 
-`INIT_IMPL=c` is the default and remains below the 1 MiB initramfs budget. The
-Rust image is currently about 1.1 MiB; `./muslin test-all` boots both variants
-and runs the same native-userland checks in each guest.
+`INIT_IMPL=c` is the default and uses gzip. Rust uses XZ and fits within
+the same 1 MiB initramfs budget. `./muslin test-all` runs the same
+native-userland checks in both guests.
 
 `./muslin test-network` selects a temporary host port, boots the guest, obtains
 a DHCP lease, and verifies the status service through QEMU's TCP forwarding.
@@ -107,9 +114,8 @@ Builds produce disposable `out/base-c.ext4` and `out/base-rs.ext4` images from
 their matching initramfs archives. `./muslin run` copies the selected base to
 `state/rootfs-c.ext4` on first use and reuses that disk thereafter. Builds,
 `clean`, `distclean`, and reproducibility checks leave `state/` intact. The
-kernel limit is 1.75 MiB, the default C initramfs limit is 1 MiB, and the base
-disk capacity is 32 MiB. Rust init remains experimental and exceeds the 1 MiB
-initramfs gate; `test-s5` checks C's size gate and exercises both variants.
+x86 kernel limit is 1.75 MiB, the initramfs limit is 1 MiB, and the base
+disk capacity is 32 MiB. `test-s5` exercises and checks sizes for both variants.
 
 Existing `out/rootfs-*.ext4` disks are migrated before `run` or cleanup: the
 runtime copy goes under `state/`, and the original is archived as
@@ -132,8 +138,9 @@ mpkg install /path/hello-1.0.0.mpkg
 ```
 
 The format is a zstd-compressed POSIX ustar archive with `manifest`, `files`,
-and `root/` payload entries. The manifest contains `name=` and `version=`;
-`files` must list every payload file exactly once using absolute paths.
+and `root/` payload entries. The manifest contains `name=` and `version=`,
+plus an optional `depends=` field with comma-separated package names.
+The `files` entry lists every payload file exactly once using absolute paths.
 Names and versions use ASCII letters/digits plus `.`, `_`, `+`, and `-`, start
 with a letter/digit, and are limited to 64 bytes. Payload paths use printable
 ASCII without spaces or backslashes and are limited to 255 bytes.
@@ -153,10 +160,10 @@ recovers a journal left by interruption. Empty directories may remain after
 rollback. Package metadata is committed under `/var/lib/mpkg/NAME/`.
 Payload and package database must be on the same filesystem.
 
-Checksums must come from a trusted source; a sidecar alone does not authenticate
-the publisher. Package signing, dependencies, removal, and upgrades remain
-future work. `mpkg` is static; zstd and its musl/shared-library dependencies are
-disk-only and do not increase the initramfs size.
+Checksums must come from a trusted source. Install dependencies before
+installing the dependent package. Package signing, dependency resolution and
+version constraints, removal, and upgrades remain future work. `mpkg` is
+static. Zstd and its runtime libraries are installed on disk.
 
 ## PostgreSQL workload
 

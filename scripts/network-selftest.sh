@@ -15,7 +15,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 HOST_HTTP_PORT=$PORT APPEND_EXTRA=muslin.networktest \
-    "$(dirname "$0")/run-qemu.sh" "$KERNEL" "$INITRD" </dev/null >"$LOG" 2>&1 &
+    "${QEMU_RUNNER:-$(dirname "$0")/run-qemu.sh}" "$KERNEL" "$INITRD" </dev/null >"$LOG" 2>&1 &
 QEMU_PID=$!
 
 attempt=0

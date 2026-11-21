@@ -22,7 +22,7 @@ def boot(disk, commands, log_path):
         port = sock.getsockname()[1]
     env = dict(os.environ, DISK_IMAGE=str(disk), MEM='256M', HOST_HTTP_PORT=str(port),
                APPEND_EXTRA='muslin.root=/dev/vda muslin.postgres muslin.acceptance')
-    process = subprocess.Popen([str(HERE/'run-qemu.sh'), str(KERNEL), str(INITRD)],
+    process = subprocess.Popen([os.environ.get('QEMU_RUNNER', str(HERE/'run-qemu.sh')), str(KERNEL), str(INITRD)],
                                env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT)
     output = bytearray()

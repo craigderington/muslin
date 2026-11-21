@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build regressions: reproducible disk metadata, variant identity and state isolation."""
 import gzip
+import lzma
 import hashlib
 import os
 from pathlib import Path
@@ -26,7 +27,8 @@ def sha(path):
 with tempfile.TemporaryDirectory(prefix='muslin-build-test-') as temporary:
     work = Path(temporary)
     for variant in ('c', 'rs'):
-        initrd = OUT/f'initramfs-{variant}.cpio.gz'
+        suffix, decompress = ('xz', lzma.decompress) if variant == 'rs' else ('gz', gzip.decompress)
+        initrd = OUT/f'initramfs-{variant}.cpio.{suffix}'
         a, b = work/f'{variant}-a.ext4', work/f'{variant}-b.ext4'
         run(HERE/'mkrootfs.sh', initrd, OUT/'mpkg', a, '32')
         time.sleep(1.1)  # Catch host ctime leaking into the second image.
@@ -34,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix='muslin-build-test-') as temporary:
         assert sha(a) == sha(b), f'{variant}: ext4 not reproducible'
         stage = work/variant
         stage.mkdir()
-        subprocess.run(['cpio', '-id', '--quiet', '--no-preserve-owner'], input=gzip.decompress(initrd.read_bytes()), cwd=stage, check=True)
+        subprocess.run(['cpio', '-id', '--quiet', '--no-preserve-owner'], input=decompress(initrd.read_bytes()), cwd=stage, check=True)
         extracted = work/f'init-{variant}'
         run('debugfs', '-R', f'dump /sbin/init {extracted}', a)
         assert sha(extracted) == sha(stage/'sbin/init') == sha(OUT/f'init-{variant}'), 'wrong disk init variant'

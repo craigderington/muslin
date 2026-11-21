@@ -28,10 +28,15 @@ cp -a "$OVERLAY"/. "$STAGE"/
 busybox_applets=$(${BB_RUNNER:-} "$BB" --list | wc -l)
 echo "userland: $busybox_applets BusyBox applets + 4 native Rust applets + 1 Go tool"
 
+case "$OUT" in
+    *.xz) set -- xz -6 --check=crc32 --threads=1 ;;
+    *) set -- gzip -9n ;;
+esac
+
 # cpio stores mtimes; normalize every entry so identical inputs reproduce.
 find "$STAGE" -exec touch -h -d "@${SOURCE_DATE_EPOCH:-0}" {} +
 
 ( cd "$STAGE" && find . -print0 | sort -z | \
     cpio --null -o -H newc --owner=0:0 --reproducible --quiet ) \
-    | gzip -9n > "$OUT"
+    | "$@" > "$OUT"
 echo "initramfs: $OUT ($(du -h "$OUT" | cut -f1))"

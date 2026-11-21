@@ -3,12 +3,19 @@ B := build/arm64
 DL := build/dl
 OUT := out/arm64
 KERNEL_IMAGE := $(OUT)/Image
+POSTGRES_KERNEL := $(OUT)/Image-postgres
+KERNEL_BOOT_TARGET := Image
+KERNEL_BOOT_PATH := arch/arm64/boot/Image
+KERNEL_SIZE_MAX ?= 5242880
+BOOT_BUDGET_MS ?= 1000
 CC := $(CURDIR)/scripts/arm64-cc.sh
 STRIP := llvm-strip
 # Zig supplies musl startup objects; Rust's bundled copies would duplicate them.
 RUSTC := rustc -C linker=$(CC) -C link-self-contained=no
 RUST_TARGET := aarch64-unknown-linux-musl
 GOARCH := arm64
+export GUEST_ARCH := aarch64
+export GUEST_SYSROOT := /opt/arm64-root
 export BB_RUNNER := qemu-aarch64
 export QEMU_RUNNER := scripts/run-qemu-arm64.sh
 export ZIG_GLOBAL_CACHE_DIR := $(CURDIR)/$(B)/zig-cache
@@ -17,18 +24,29 @@ KERNEL_MAKE_FLAGS := ARCH=arm64 LLVM=1
 BUSYBOX_MAKE_FLAGS := ARCH=arm64 AR=llvm-ar NM=llvm-nm STRIP=llvm-strip
 
 include Makefile
+POSTGRES_RUNTIME := state/arm64/postgres-$(INIT_IMPL).ext4
+POSTGRES_KERNEL_SIZE_MAX := 6291456
+RUNTIME_DISK := state/arm64/rootfs-$(INIT_IMPL).ext4
 .DEFAULT_GOAL := arm64
 
 $(KERNEL_IMAGE) $(INITRAMFS) $(INIT_C_BIN) $(INIT_RS_BIN) $(TOOLS_BIN) $(GO_BIN): Makefile.arm64
 $(INIT_C_BIN) $(INIT_RS_BIN) $(TOOLS_BIN) $(BUSYBOX_BIN): scripts/arm64-cc.sh
 
-.PHONY: arm64 test-arm64 run-arm64
+.PHONY: arm64 test-arm64 test-network-arm64 test-storage-arm64 budget-arm64 run-arm64
 arm64: $(KERNEL_IMAGE) $(INITRAMFS)
 test-arm64: arm64
 	scripts/selftest.sh $(KERNEL_IMAGE) $(INITRAMFS)
 	python3 scripts/arm64-console-selftest.py $(KERNEL_IMAGE) $(INITRAMFS)
-run-arm64: arm64
-	scripts/run-qemu-arm64.sh $(KERNEL_IMAGE) $(INITRAMFS)
+test-network-arm64: export ARM64_NETWORK := 1
+test-network-arm64: test-network
+
+test-storage-arm64: test-persistence test-package
+
+budget-arm64: size
+	BOOT_BUDGET_MS=$(BOOT_BUDGET_MS) scripts/selftest.sh $(KERNEL_IMAGE) $(INITRAMFS)
+
+run-arm64: arm64 runtime-disk
+	ARM64_NETWORK=1 DISK_IMAGE=$(RUNTIME_DISK) APPEND_EXTRA="muslin.root=/dev/vda $(APPEND_EXTRA)" scripts/run-qemu-arm64.sh $(KERNEL_IMAGE) $(INITRAMFS)
 
 $(KERNEL_IMAGE): $(KSRC)/.config
 	@mkdir -p $(OUT)

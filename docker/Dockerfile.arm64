@@ -1,4 +1,8 @@
+FROM --platform=linux/arm64 alpine:3.20 AS arm64-keys
 FROM muslin-builder:latest
 RUN apk add --no-cache zig clang lld llvm qemu-system-aarch64 qemu-aarch64
 RUN rustup target add --toolchain 1.78.0 aarch64-unknown-linux-musl
 ENV ZIG_GLOBAL_CACHE_DIR=/tmp/zig-cache
+COPY --from=arm64-keys /etc/apk/keys/ /opt/arm64-root/etc/apk/keys/
+RUN apk --root /opt/arm64-root --arch aarch64 --initdb --no-scripts --no-cache \
+    --repositories-file /etc/apk/repositories add zstd tzdata gcc musl-dev linux-headers

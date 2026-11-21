@@ -8,6 +8,11 @@ services:
     tty: true
     command: make -f Makefile.arm64 arm64
 
+  qemu-arm64:
+    extends: { service: arm64 }
+    network_mode: host
+    environment: [ "HOST_HTTP_PORT=${HOST_HTTP_PORT:-4217}" ]
+
   builder:
     build: { context: ., dockerfile: docker/Dockerfile }
     image: muslin-builder:latest

@@ -14,7 +14,7 @@ cp --sparse=always "$ROOTFS" "$DISK"
 boot() {
     : >"$LOG"
     DISK_IMAGE=$DISK APPEND_EXTRA="muslin.root=/dev/vda muslin.persisttest" \
-        timeout "${TIMEOUT:-30}" "$(dirname "$0")/run-qemu.sh" \
+        timeout "${TIMEOUT:-30}" "${QEMU_RUNNER:-$(dirname "$0")/run-qemu.sh}" \
         "$KERNEL" "$INITRD" </dev/null >"$LOG" 2>&1 || {
             tail -n 40 "$LOG"; echo 'FAIL: guest did not exit cleanly'; exit 1;
         }
